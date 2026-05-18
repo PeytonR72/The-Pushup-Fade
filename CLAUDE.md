@@ -322,3 +322,14 @@ Vercel builds from `origin/main` and build failures are a recurring issue. Alway
 6. **Imports are case-correct.** Windows is case-insensitive on the filesystem; Vercel (Linux) is not. `import '@/lib/Audio'` works locally but breaks on Vercel if the file is `audio.ts`. Match casing exactly.
 
 If any of the above fails, fix it before pushing. Don't "push and see what Vercel says" — Vercel time is slow feedback compared to a local build.
+
+### Vercel Project Settings (set once, but verify if 404s appear)
+A successful build that still 404s at `/` almost always means the Vercel project's Framework Preset is wrong. On the Vercel dashboard, under Project → Settings → General → Build & Development Settings, confirm:
+
+- **Framework Preset**: `Next.js` (NOT "Other" or "Static" — those serve the repo as static files, ignore Next.js routing, and 404 on every dynamic route)
+- **Root Directory**: empty or `./` (the app lives at repo root)
+- **Build Command**: default (`next build`) — leave empty unless you have a reason
+- **Output Directory**: default (`.next`) — leave empty
+- **Install Command**: default (`npm install`) — leave empty
+
+If you change the preset, trigger a fresh deploy with the build cache disabled. This was the root cause of the 404 on 2026-05-17 after a successful build.
