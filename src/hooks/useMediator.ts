@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
@@ -227,4 +228,11 @@ export function useMediator(options: UseMediatorOptions): UseMediatorReturn {
   }, [active])
 
   return { subState, repsCompleted, repsMissed }
+=======
+// Mediator state machine hook.
+// Implementation lands with /solo wiring; this file is an intentional shell.
+
+export function useMediator(): null {
+  return null
+>>>>>>> origin/main
 }

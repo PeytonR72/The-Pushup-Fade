@@ -24,6 +24,7 @@ button {
   font-family: inherit;
   color: inherit;
 }
+<<<<<<< HEAD
 
 @keyframes rep-flash {
   0% { opacity: 0.85; }
@@ -33,3 +34,5 @@ button {
 .animate-rep-flash {
   animation: rep-flash 220ms ease-out forwards;
 }
+=======
+>>>>>>> origin/main

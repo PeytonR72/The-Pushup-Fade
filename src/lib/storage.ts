@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import type { Grade, Session, StoredStats } from '@/types'
 
 export const STORAGE_KEY = 'pushup-fade-stats'
@@ -55,3 +56,9 @@ export function gradeFor(completed: number, missed: number): Grade {
   if (rate >= 0.5) return 'C'
   return 'F'
 }
+=======
+// localStorage read/write helpers.
+// Implementation lands alongside session save/results flow; this file is an intentional shell.
+
+export const STORAGE_KEY = 'pushup-fade-stats'
+>>>>>>> origin/main
