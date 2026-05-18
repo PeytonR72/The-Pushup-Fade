@@ -61,7 +61,6 @@ export const POSE_LANDMARKS = {
   RIGHT_ELBOW: 14,
   LEFT_WRIST: 15,
   RIGHT_WRIST: 16,
-<<<<<<< HEAD
   LEFT_HIP: 23,
   RIGHT_HIP: 24,
   LEFT_ANKLE: 27,
@@ -71,10 +70,6 @@ export const POSE_LANDMARKS = {
 export const PLANK_AXIS_ANGLE_MAX_DEG = 25
 export const PLANK_HIP_DEVIATION_MAX = 0.1
 
-=======
-} as const
-
->>>>>>> origin/main
 export const MEDIAPIPE_CDN = {
   POSE: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js',
   DRAWING_UTILS: 'https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js',
@@ -89,7 +84,6 @@ export function calculateAngle(a: Point2D, b: Point2D, c: Point2D): number {
   return angle
 }
 
-<<<<<<< HEAD
 export function midpoint(a: Point2D, b: Point2D): Point2D {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
 }
@@ -126,8 +120,6 @@ export function isPlankValid(
   )
 }
 
-=======
->>>>>>> origin/main
 function loadScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>(`script[data-mp="${src}"]`)
