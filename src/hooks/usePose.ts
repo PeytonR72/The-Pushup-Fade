@@ -11,6 +11,8 @@ import {
   PLANK_AXIS_ANGLE_MAX_DEG,
   PLANK_HIP_DEVIATION_MAX,
   POSE_LANDMARKS,
+  WRIST_ALIGN_MAX_RATIO,
+  wristAlignmentRatio,
   type CameraInstance,
   type Landmark,
   type PoseInstance,
@@ -219,8 +221,17 @@ export function usePose(): UsePoseReturn {
 
       const axisAngle = bodyAxisAngleFromHorizontal(midShoulder, midAnkle)
       const hipDev = hipDeviationFromAxis(midShoulder, midHip, midAnkle)
+
+      const shoulderWidth = Math.abs(ls.x - rs.x)
+      const leftWristDev = wristAlignmentRatio(ls, lw, shoulderWidth)
+      const rightWristDev = wristAlignmentRatio(rs, rw, shoulderWidth)
+      const wristsAligned =
+        leftWristDev <= WRIST_ALIGN_MAX_RATIO && rightWristDev <= WRIST_ALIGN_MAX_RATIO
+
       const plank =
-        axisAngle <= PLANK_AXIS_ANGLE_MAX_DEG && hipDev <= PLANK_HIP_DEVIATION_MAX
+        axisAngle <= PLANK_AXIS_ANGLE_MAX_DEG &&
+        hipDev <= PLANK_HIP_DEVIATION_MAX &&
+        wristsAligned
 
       setMidShoulderY(midShoulder.y)
       setPlankValid(plank)
