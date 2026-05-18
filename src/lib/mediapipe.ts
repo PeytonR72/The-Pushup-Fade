@@ -61,8 +61,20 @@ export const POSE_LANDMARKS = {
   RIGHT_ELBOW: 14,
   LEFT_WRIST: 15,
   RIGHT_WRIST: 16,
+<<<<<<< HEAD
+  LEFT_HIP: 23,
+  RIGHT_HIP: 24,
+  LEFT_ANKLE: 27,
+  RIGHT_ANKLE: 28,
 } as const
 
+export const PLANK_AXIS_ANGLE_MAX_DEG = 25
+export const PLANK_HIP_DEVIATION_MAX = 0.1
+
+=======
+} as const
+
+>>>>>>> origin/main
 export const MEDIAPIPE_CDN = {
   POSE: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js',
   DRAWING_UTILS: 'https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js',
@@ -77,6 +89,45 @@ export function calculateAngle(a: Point2D, b: Point2D, c: Point2D): number {
   return angle
 }
 
+<<<<<<< HEAD
+export function midpoint(a: Point2D, b: Point2D): Point2D {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+}
+
+export function bodyAxisAngleFromHorizontal(
+  midShoulder: Point2D,
+  midAnkle: Point2D,
+): number {
+  const dx = Math.abs(midAnkle.x - midShoulder.x)
+  const dy = Math.abs(midAnkle.y - midShoulder.y)
+  return (Math.atan2(dy, dx) * 180) / Math.PI
+}
+
+export function hipDeviationFromAxis(
+  midShoulder: Point2D,
+  midHip: Point2D,
+  midAnkle: Point2D,
+): number {
+  const dx = midAnkle.x - midShoulder.x
+  if (Math.abs(dx) < 1e-6) return 0
+  const t = (midHip.x - midShoulder.x) / dx
+  const expectedY = midShoulder.y + t * (midAnkle.y - midShoulder.y)
+  return Math.abs(midHip.y - expectedY)
+}
+
+export function isPlankValid(
+  midShoulder: Point2D,
+  midHip: Point2D,
+  midAnkle: Point2D,
+): boolean {
+  return (
+    bodyAxisAngleFromHorizontal(midShoulder, midAnkle) <= PLANK_AXIS_ANGLE_MAX_DEG &&
+    hipDeviationFromAxis(midShoulder, midHip, midAnkle) <= PLANK_HIP_DEVIATION_MAX
+  )
+}
+
+=======
+>>>>>>> origin/main
 function loadScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>(`script[data-mp="${src}"]`)
