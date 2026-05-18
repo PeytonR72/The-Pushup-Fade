@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-<<<<<<< HEAD
   bodyAxisAngleFromHorizontal,
   calculateAngle,
   hipDeviationFromAxis,
@@ -11,11 +10,6 @@ import {
   midpoint,
   PLANK_AXIS_ANGLE_MAX_DEG,
   PLANK_HIP_DEVIATION_MAX,
-=======
-  calculateAngle,
-  loadMediaPipeScripts,
-  MEDIAPIPE_CDN,
->>>>>>> origin/main
   POSE_LANDMARKS,
   type CameraInstance,
   type Landmark,
@@ -23,7 +17,6 @@ import {
   type PoseResults,
 } from '@/lib/mediapipe'
 
-<<<<<<< HEAD
 export interface UsePoseReturn {
   videoRef: React.RefObject<HTMLVideoElement>
   canvasRef: React.RefObject<HTMLCanvasElement>
@@ -36,28 +29,12 @@ export interface UsePoseReturn {
   error: string | null
   visibilityWarning: boolean
   postureWarning: boolean
-=======
-export type ActiveSide = 'left' | 'right'
-
-export interface UsePoseReturn {
-  videoRef: React.RefObject<HTMLVideoElement>
-  canvasRef: React.RefObject<HTMLCanvasElement>
-  elbowAngle: number | null
-  poseDetected: boolean
-  isLoading: boolean
-  error: string | null
-  visibilityWarning: boolean
-  activeSide: ActiveSide | null
->>>>>>> origin/main
   retry: () => void
 }
 
 const VISIBILITY_THRESHOLD = 0.5
 const LOW_VISIBILITY_FRAME_LIMIT = 10
-<<<<<<< HEAD
 const INVALID_PLANK_FRAME_LIMIT = 10
-=======
->>>>>>> origin/main
 
 export function usePose(): UsePoseReturn {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -66,7 +43,6 @@ export function usePose(): UsePoseReturn {
   const poseRef = useRef<PoseInstance | null>(null)
   const cameraRef = useRef<CameraInstance | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-<<<<<<< HEAD
   const lowVisibilityFramesRef = useRef(0)
   const invalidPlankFramesRef = useRef(0)
 
@@ -80,18 +56,6 @@ export function usePose(): UsePoseReturn {
   const [error, setError] = useState<string | null>(null)
   const [visibilityWarning, setVisibilityWarning] = useState(false)
   const [postureWarning, setPostureWarning] = useState(false)
-=======
-  const activeSideRef = useRef<ActiveSide | null>(null)
-  const lowVisibilityFramesRef = useRef(0)
-
-  const [retryToken, setRetryToken] = useState(0)
-  const [elbowAngle, setElbowAngle] = useState<number | null>(null)
-  const [poseDetected, setPoseDetected] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [visibilityWarning, setVisibilityWarning] = useState(false)
-  const [activeSide, setActiveSide] = useState<ActiveSide | null>(null)
->>>>>>> origin/main
 
   const retry = useCallback(() => {
     setRetryToken((token) => token + 1)
@@ -103,7 +67,6 @@ export function usePose(): UsePoseReturn {
 
     setIsLoading(true)
     setError(null)
-<<<<<<< HEAD
     setLeftElbowAngle(null)
     setRightElbowAngle(null)
     setMidShoulderY(null)
@@ -115,16 +78,6 @@ export function usePose(): UsePoseReturn {
     invalidPlankFramesRef.current = 0
 
     const drawArm = (
-=======
-    setElbowAngle(null)
-    setPoseDetected(false)
-    setVisibilityWarning(false)
-    setActiveSide(null)
-    activeSideRef.current = null
-    lowVisibilityFramesRef.current = 0
-
-    const drawOverlay = (
->>>>>>> origin/main
       ctx: CanvasRenderingContext2D,
       canvas: HTMLCanvasElement,
       shoulder: Landmark,
@@ -160,7 +113,6 @@ export function usePose(): UsePoseReturn {
       }
 
       const label = `${Math.round(angle)} deg`
-<<<<<<< HEAD
       ctx.font = '600 16px "IBM Plex Mono", ui-monospace, monospace'
       ctx.textBaseline = 'top'
       ctx.fillStyle = '#0a0a0a'
@@ -181,14 +133,6 @@ export function usePose(): UsePoseReturn {
       ctx.moveTo(a.x * canvas.width, a.y * canvas.height)
       ctx.lineTo(b.x * canvas.width, b.y * canvas.height)
       ctx.stroke()
-=======
-      ctx.font = '600 18px "IBM Plex Mono", ui-monospace, monospace'
-      ctx.textBaseline = 'top'
-      ctx.fillStyle = '#0a0a0a'
-      ctx.fillText(label, ex + 13, ey - 23)
-      ctx.fillStyle = '#f0ede8'
-      ctx.fillText(label, ex + 12, ey - 24)
->>>>>>> origin/main
     }
 
     const handleResults = (results: PoseResults) => {
@@ -206,16 +150,11 @@ export function usePose(): UsePoseReturn {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
 
       const landmarks = results.poseLandmarks
-<<<<<<< HEAD
       if (!landmarks || landmarks.length < 29) {
-=======
-      if (!landmarks || landmarks.length < 17) {
->>>>>>> origin/main
         setPoseDetected(false)
         return
       }
 
-<<<<<<< HEAD
       const ls = landmarks[POSE_LANDMARKS.LEFT_SHOULDER]
       const rs = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER]
       const le = landmarks[POSE_LANDMARKS.LEFT_ELBOW]
@@ -245,37 +184,10 @@ export function usePose(): UsePoseReturn {
         lowVisibilityFramesRef.current = 0
         setVisibilityWarning(false)
       } else {
-=======
-      if (!activeSideRef.current) {
-        const leftElbowVis = landmarks[POSE_LANDMARKS.LEFT_ELBOW]?.visibility ?? 0
-        const rightElbowVis = landmarks[POSE_LANDMARKS.RIGHT_ELBOW]?.visibility ?? 0
-        if (leftElbowVis < VISIBILITY_THRESHOLD && rightElbowVis < VISIBILITY_THRESHOLD) {
-          setPoseDetected(false)
-          return
-        }
-        const side: ActiveSide = leftElbowVis >= rightElbowVis ? 'left' : 'right'
-        activeSideRef.current = side
-        setActiveSide(side)
-      }
-
-      const side = activeSideRef.current
-      const shoulderIdx =
-        side === 'left' ? POSE_LANDMARKS.LEFT_SHOULDER : POSE_LANDMARKS.RIGHT_SHOULDER
-      const elbowIdx = side === 'left' ? POSE_LANDMARKS.LEFT_ELBOW : POSE_LANDMARKS.RIGHT_ELBOW
-      const wristIdx = side === 'left' ? POSE_LANDMARKS.LEFT_WRIST : POSE_LANDMARKS.RIGHT_WRIST
-
-      const shoulder = landmarks[shoulderIdx]
-      const elbow = landmarks[elbowIdx]
-      const wrist = landmarks[wristIdx]
-
-      const elbowVisibility = elbow.visibility ?? 0
-      if (elbowVisibility < VISIBILITY_THRESHOLD) {
->>>>>>> origin/main
         lowVisibilityFramesRef.current += 1
         if (lowVisibilityFramesRef.current > LOW_VISIBILITY_FRAME_LIMIT) {
           setVisibilityWarning(true)
         }
-<<<<<<< HEAD
       }
 
       if (!elbowsVisible) {
@@ -322,18 +234,6 @@ export function usePose(): UsePoseReturn {
           setPostureWarning(true)
         }
       }
-=======
-      } else {
-        lowVisibilityFramesRef.current = 0
-        setVisibilityWarning(false)
-      }
-
-      const angle = calculateAngle(shoulder, elbow, wrist)
-      setElbowAngle(angle)
-      setPoseDetected(true)
-
-      drawOverlay(ctx, canvas, shoulder, elbow, wrist, angle)
->>>>>>> origin/main
     }
 
     const start = async () => {
@@ -449,7 +349,6 @@ export function usePose(): UsePoseReturn {
   return {
     videoRef,
     canvasRef,
-<<<<<<< HEAD
     leftElbowAngle,
     rightElbowAngle,
     midShoulderY,
@@ -459,14 +358,6 @@ export function usePose(): UsePoseReturn {
     error,
     visibilityWarning,
     postureWarning,
-=======
-    elbowAngle,
-    poseDetected,
-    isLoading,
-    error,
-    visibilityWarning,
-    activeSide,
->>>>>>> origin/main
     retry,
   }
 }

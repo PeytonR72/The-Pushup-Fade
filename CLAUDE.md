@@ -3,11 +3,7 @@
 ## What This Is
 A competitive push-up battle web app. In Phase 1 (current), it is a single-player experience where
 a voice mediator calls "down" and "up" commands and the app uses MediaPipe Pose to verify the user
-<<<<<<< HEAD
 completes each rep correctly via webcam. The user will be facing the camera at this stage in development (subject to change).Stats are saved locally. No backend logic runs in Phase 1.
-=======
-completes each rep correctly via webcam. Stats are saved locally. No backend logic runs in Phase 1.
->>>>>>> origin/main
 Phase 2 will introduce invite-only multiplayer faceoffs. Phase 3 will introduce matchmaking.
 
 ## Tech Stack
@@ -85,12 +81,8 @@ The /solo page operates as a state machine with exactly 5 top-level states:
 - Request webcam permission
 - Initialize MediaPipe Pose from CDN
 - Show camera feed with landmark overlay once pose is detected
-<<<<<<< HEAD
 - Show "READY" button only after both arms are detected: both elbow landmarks have visibility
   >= 0.5 and both elbow angles are computable
-=======
-- Show "READY" button only after pose landmarks are visible and elbow angle is detectable
->>>>>>> origin/main
 - Do not allow the user to proceed until pose is confirmed
 
 ### 2. COUNTDOWN
@@ -105,7 +97,6 @@ The mediator loop runs. Each rep goes through these internal sub-states in order
 ```
 WAITING_FOR_DOWN
   → play down.mp3 immediately when this sub-state begins
-<<<<<<< HEAD
   → on entry, begin tracking topShoulderY: the running minimum of midShoulder.y observed during
     this sub-state. (Normalized image coords: y = 0 is top of frame, y = 1 is bottom. The minimum
     of midShoulder.y is therefore the highest shoulder position seen so far, which auto-calibrates
@@ -116,33 +107,20 @@ WAITING_FOR_DOWN
       - right elbow angle < 90°
       - (current midShoulder.y - topShoulderY) >= 0.08 (shoulders have traveled at least 8% of
         frame height downward from the auto-captured baseline)
-=======
-  → compliance window: user has 2000ms to reach bottom position (elbow angle < 90°)
->>>>>>> origin/main
   → if compliant in time: transition to HOLDING_BOTTOM
   → if window expires: mark rep as MISSED, restart cycle from WAITING_FOR_DOWN
 
 HOLDING_BOTTOM
-<<<<<<< HEAD
   → user must maintain bottom position (both left and right elbow angles stay < 90°)
   → hold duration: random integer between 1000ms and 3500ms, chosen fresh each rep
   → if either elbow angle exceeds 90° before hold expires: mark rep as MISSED,
-=======
-  → user must maintain bottom position (elbow angle stays < 90°)
-  → hold duration: random integer between 1000ms and 3500ms, chosen fresh each rep
-  → if user rises early (elbow angle exceeds 90° before hold expires): mark rep as MISSED,
->>>>>>> origin/main
     restart from WAITING_FOR_DOWN
   → when hold expires: transition to WAITING_FOR_UP
 
 WAITING_FOR_UP
   → play up.mp3 immediately when this sub-state begins
-<<<<<<< HEAD
   → compliance window: user has 2000ms to return to top position
   → top position requires BOTH left and right elbow angles > 150°
-=======
-  → compliance window: user has 2000ms to return to top position (elbow angle > 150°)
->>>>>>> origin/main
   → if compliant in time: increment repsCompleted, transition to REST_AT_TOP
   → if window expires: mark rep as MISSED, restart from WAITING_FOR_DOWN
 
@@ -190,7 +168,6 @@ https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js
 https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js
 ```
 
-<<<<<<< HEAD
 ### Forward-Facing Setup and Landmark Selection
 Phase 1 assumes a forward-facing camera (phone or laptop placed in front of the user, low or at
 floor level, framing the whole body in plank). Both arms are tracked symmetrically every frame.
@@ -210,12 +187,6 @@ For posture checks, compute screen-space midpoints:
 
 Compute the elbow angle independently for each side using the formula below. Both angles must
 satisfy the rep thresholds — the user must move both arms together.
-=======
-### Elbow Angle Calculation
-Use landmarks: shoulder (11 or 12), elbow (13 or 14), wrist (15 or 16).
-At runtime, pick whichever side (left or right) has higher visibility score and lock to it for the
-session. Do not switch sides mid-session.
->>>>>>> origin/main
 
 Angle formula (vector-based, not dot product shortcut):
 ```typescript
@@ -232,7 +203,6 @@ function calculateAngle(
 ```
 
 ### Canvas Overlay
-<<<<<<< HEAD
 Draw on a `<canvas>` element absolutely positioned over the `<video>` element. Draw:
 - Both arms: each side's shoulder -> elbow -> wrist as connected line segments with filled
   circles at each landmark.
@@ -262,17 +232,6 @@ If plank is invalid for more than 10 consecutive frames during the ACTIVE state,
 session and show: "GET IN PUSHUP POSITION". Resume when plank is valid again. This gate is
 evaluated only during ACTIVE (and PAUSED, where it is irrelevant); SETUP and COUNTDOWN do not
 enforce it.
-=======
-Draw on a `<canvas>` element absolutely positioned over the `<video>` element.
-Draw only: the three relevant landmarks (shoulder, elbow, wrist) as filled circles,
-and the two connecting lines between them. Do NOT draw the full MediaPipe skeleton.
-The angle value should be displayed as text near the elbow landmark.
-
-### Low Light / Visibility Warning
-If the active side's elbow landmark visibility score drops below 0.5 for more than 10 consecutive
-frames, pause the session automatically and show a warning: "MOVE TO BETTER LIGHT OR REPOSITION".
-Resume when visibility recovers.
->>>>>>> origin/main
 
 ## Audio Implementation
 
