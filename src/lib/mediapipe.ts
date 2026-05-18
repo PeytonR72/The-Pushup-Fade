@@ -69,6 +69,7 @@ export const POSE_LANDMARKS = {
 
 export const PLANK_AXIS_ANGLE_MAX_DEG = 25
 export const PLANK_HIP_DEVIATION_MAX = 0.1
+export const WRIST_ALIGN_MAX_RATIO = 1.0
 
 export const MEDIAPIPE_CDN = {
   POSE: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js',
@@ -118,6 +119,15 @@ export function isPlankValid(
     bodyAxisAngleFromHorizontal(midShoulder, midAnkle) <= PLANK_AXIS_ANGLE_MAX_DEG &&
     hipDeviationFromAxis(midShoulder, midHip, midAnkle) <= PLANK_HIP_DEVIATION_MAX
   )
+}
+
+export function wristAlignmentRatio(
+  shoulder: Point2D,
+  wrist: Point2D,
+  shoulderWidth: number,
+): number {
+  if (shoulderWidth < 1e-6) return Infinity
+  return Math.abs(wrist.x - shoulder.x) / shoulderWidth
 }
 
 function loadScript(src: string): Promise<void> {

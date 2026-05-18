@@ -218,15 +218,28 @@ the session automatically and show: "MOVE TO BETTER LIGHT OR REPOSITION". Resume
 recovers. This warning is suppressed in SETUP, since the user may not yet be in frame.
 
 ### Plank Posture Gate
-The user must be in plank position for rep detection to run. Each frame, compute:
+The user must be in plank position with hands roughly under shoulders for rep detection to run.
+Each frame, compute:
 
 - bodyAxisAngle = atan2(|midAnkle.y - midShoulder.y|, |midAnkle.x - midShoulder.x|) * 180 / PI
   (angle of the body axis from horizontal, in degrees, range 0-90)
 - hipDeviation = perpendicular(ish) distance from midHip to the line midShoulder->midAnkle,
   measured as |midHip.y - lineYAtX(midHip.x)| in normalized image coords. If the line is
   degenerate (midAnkle.x ≈ midShoulder.x), treat hipDeviation as 0.
+- shoulderWidth = |LEFT_SHOULDER.x - RIGHT_SHOULDER.x| in normalized image coords. This is
+  used as a per-user scale so the tolerance auto-adjusts to camera distance.
+- leftWristDeviation = |LEFT_WRIST.x - LEFT_SHOULDER.x| / shoulderWidth
+- rightWristDeviation = |RIGHT_WRIST.x - RIGHT_SHOULDER.x| / shoulderWidth
+  (each wrist's horizontal distance from its shoulder, expressed as a multiple of shoulder width)
 
-Plank is valid when bodyAxisAngle <= 25° AND hipDeviation <= 0.10.
+Plank is valid when ALL of:
+- bodyAxisAngle <= 25°
+- hipDeviation <= 0.10
+- leftWristDeviation <= 1.0
+- rightWristDeviation <= 1.0
+
+(The wrist tolerance of 1.0× shoulder width is generous on purpose — it catches obviously wide
+hand placement without flagging legitimate variations like slightly-outside-shoulder-width hands.)
 
 If plank is invalid for more than 10 consecutive frames during the ACTIVE state, pause the
 session and show: "GET IN PUSHUP POSITION". Resume when plank is valid again. This gate is
