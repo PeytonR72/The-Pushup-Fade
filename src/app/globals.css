@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-ink: #0a0a0a;
+  --color-bone: #f0ede8;
+  --color-blood: #c0392b;
+  --font-bebas: 'Bebas Neue', sans-serif;
+  --font-plex-mono: 'IBM Plex Mono', monospace;
+}
+
+html,
+body {
+  background-color: var(--color-ink);
+  color: var(--color-bone);
+  font-family: var(--font-plex-mono);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+}
+
+@keyframes rep-flash {
+  0% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+.animate-rep-flash {
+  animation: rep-flash 220ms ease-out forwards;
+}
