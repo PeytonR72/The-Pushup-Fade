@@ -292,3 +292,33 @@ client setup.
 - All timers and intervals must be cleaned up in useEffect return functions
 - All MediaPipe and Web Audio API calls wrapped in try/catch with console.error logging
 - Never use em dashes in comments, strings, or any text content in the app
+
+## For Future Claude: Keep This Document Current
+This file is the project's memory across sessions. Update it as part of your work, not as a separate ask.
+
+- Made a non-obvious decision (threshold values, an architecture choice, "we tried X and it broke so we went with Y")? Add a line in the relevant section.
+- Changed a rule, formula, or threshold in the code that's documented here? Update the matching section in the same commit. Doc-vs-code drift is a bug.
+- Discovered a future-Claude-trap (the kind of thing that would waste a future session if not written down)? Document it. Examples already in this file: the no-em-dashes rule, the MediaPipe-from-CDN rule, the Vercel deploy checklist below.
+- Removed or renamed something the doc still references? Strike the stale text.
+- Don't ask the user "should I update CLAUDE.md?" — just edit it as part of the change.
+
+## Before You Push: Vercel Pre-Deploy Checklist
+Vercel builds from `origin/main` and build failures are a recurring issue. Always run these locally before pushing anything that will end up on main:
+
+1. **No merge conflict markers anywhere.** A previous merge that wasn't cleanly resolved leaves `<<<<<<< HEAD`, `=======`, `>>>>>>> ...` lines in files, including `package-lock.json`. Check with:
+   ```
+   grep -rE "(<<<<<<<|=======|>>>>>>>) " src/ package-lock.json CLAUDE.md
+   ```
+   Anything found must be removed before committing. If the GitHub "Resolve conflicts" web editor flags a PR, the markers MUST be deleted in that editor BEFORE clicking "Mark as resolved" / "Commit merge." Clicking commit with markers still in the file commits them literally — that's what broke the build on 2026-05-17.
+
+2. **Type check passes.** `npx tsc --noEmit` — must exit clean. Vercel runs this implicitly via `next build`.
+
+3. **Lint passes.** `npx next lint` — Vercel treats lint warnings as build errors in CI.
+
+4. **Full Next build passes locally.** `npx next build` — this is the exact command Vercel runs. If it works locally, it almost always works on Vercel. Run it at minimum before any merge into main.
+
+5. **Lockfile is in sync with package.json.** If you touched `package.json`, run `npm install` to refresh `package-lock.json` and commit BOTH. Vercel installs from the lockfile verbatim; drift causes "module not found" failures.
+
+6. **Imports are case-correct.** Windows is case-insensitive on the filesystem; Vercel (Linux) is not. `import '@/lib/Audio'` works locally but breaks on Vercel if the file is `audio.ts`. Match casing exactly.
+
+If any of the above fails, fix it before pushing. Don't "push and see what Vercel says" — Vercel time is slow feedback compared to a local build.
