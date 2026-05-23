@@ -2,7 +2,12 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { usePose, type MissingPart, type SetupStatus } from '@/hooks/usePose'
+import {
+  usePose,
+  type MissingPart,
+  type SetupMetrics,
+  type SetupStatus,
+} from '@/hooks/usePose'
 import { useMediator, type MediatorSubState } from '@/hooks/useMediator'
 import { AudioMediator } from '@/lib/audio'
 import { appendSession, gradeFor } from '@/lib/storage'
@@ -251,6 +256,10 @@ function GameStage({
           </div>
         )}
 
+        {gameState === 'SETUP' && !pose.isLoading && (
+          <DebugHud metrics={pose.setupMetrics} />
+        )}
+
         {gameState === 'COUNTDOWN' && (
           <div className="absolute inset-0 flex items-center justify-center bg-ink/40 pointer-events-none">
             <span className="font-display text-[160px] md:text-[240px] leading-none tracking-wider">
@@ -414,6 +423,86 @@ function ResultsView({
         >
           HOME
         </Link>
+      </div>
+    </div>
+  )
+}
+
+// Debug HUD shown in the top-left of the camera feed during SETUP. Color-codes each value
+// pass/fail so the user can see exactly which check is failing and report it back.
+// Thresholds duplicated locally rather than re-imported, to keep the page lib-agnostic.
+const HUD_KNEE_MIN_DEG = 140
+const HUD_HIP_DEV_MAX = 0.08
+const HUD_WRIST_DEV_MAX = 1.0
+const HUD_VIS_MIN = 0.3
+
+function DebugHud({ metrics }: { metrics: SetupMetrics }) {
+  const fmt = (n: number | null, digits = 0, suffix = '') =>
+    n === null ? '--' : `${n.toFixed(digits)}${suffix}`
+  const ok = (cond: boolean) => (cond ? 'text-bone' : 'text-blood')
+  const vis = metrics.visibility
+
+  return (
+    <div className="absolute top-2 left-2 font-mono text-[9px] leading-tight bg-ink/60 px-2 py-1 space-y-0.5 pointer-events-none">
+      <div>
+        KNEE{' '}
+        <span
+          className={ok(metrics.leftKneeAngle !== null && metrics.leftKneeAngle >= HUD_KNEE_MIN_DEG)}
+        >
+          L:{fmt(metrics.leftKneeAngle, 0, 'd')}
+        </span>{' '}
+        <span
+          className={ok(
+            metrics.rightKneeAngle !== null && metrics.rightKneeAngle >= HUD_KNEE_MIN_DEG,
+          )}
+        >
+          R:{fmt(metrics.rightKneeAngle, 0, 'd')}
+        </span>
+      </div>
+      <div>
+        HIP{' '}
+        <span
+          className={ok(metrics.hipDeviation !== null && metrics.hipDeviation <= HUD_HIP_DEV_MAX)}
+        >
+          {fmt(metrics.hipDeviation, 2)}
+        </span>
+      </div>
+      <div>
+        WRIST{' '}
+        <span
+          className={ok(
+            metrics.leftWristDeviation !== null && metrics.leftWristDeviation <= HUD_WRIST_DEV_MAX,
+          )}
+        >
+          L:{fmt(metrics.leftWristDeviation, 1)}
+        </span>{' '}
+        <span
+          className={ok(
+            metrics.rightWristDeviation !== null &&
+              metrics.rightWristDeviation <= HUD_WRIST_DEV_MAX,
+          )}
+        >
+          R:{fmt(metrics.rightWristDeviation, 1)}
+        </span>
+      </div>
+      <div>
+        VIS SH{' '}
+        <span className={ok(vis.shoulders.left >= HUD_VIS_MIN)}>{vis.shoulders.left.toFixed(1)}</span>/
+        <span className={ok(vis.shoulders.right >= HUD_VIS_MIN)}>{vis.shoulders.right.toFixed(1)}</span>{' '}
+        EL{' '}
+        <span className={ok(vis.elbows.left >= HUD_VIS_MIN)}>{vis.elbows.left.toFixed(1)}</span>/
+        <span className={ok(vis.elbows.right >= HUD_VIS_MIN)}>{vis.elbows.right.toFixed(1)}</span>
+      </div>
+      <div>
+        VIS HI{' '}
+        <span className={ok(vis.hips.left >= HUD_VIS_MIN)}>{vis.hips.left.toFixed(1)}</span>/
+        <span className={ok(vis.hips.right >= HUD_VIS_MIN)}>{vis.hips.right.toFixed(1)}</span>{' '}
+        KN{' '}
+        <span className={ok(vis.knees.left >= HUD_VIS_MIN)}>{vis.knees.left.toFixed(1)}</span>/
+        <span className={ok(vis.knees.right >= HUD_VIS_MIN)}>{vis.knees.right.toFixed(1)}</span>{' '}
+        AN{' '}
+        <span className={ok(vis.ankles.left >= HUD_VIS_MIN)}>{vis.ankles.left.toFixed(1)}</span>/
+        <span className={ok(vis.ankles.right >= HUD_VIS_MIN)}>{vis.ankles.right.toFixed(1)}</span>
       </div>
     </div>
   )
