@@ -58,11 +58,27 @@ function GameStage({
   const pose = usePose()
   const audioRef = useRef<AudioMediator | null>(null)
   const startTimeRef = useRef<number | null>(null)
+  const setupHoldStartRef = useRef<number | null>(null)
+  const setupStatusRef = useRef(pose.setupStatus)
   const [countdownNum, setCountdownNum] = useState(3)
   const [elapsedSec, setElapsedSec] = useState(0)
   const [flashKey, setFlashKey] = useState(0)
+  const [holdRemaining, setHoldRemaining] = useState<number | null>(null)
 
   useEffect(() => {
+    setupStatusRef.current = pose.setupStatus
+  }, [pose.setupStatus])
+
+  // Init audio on mount so the auto-start (which is not a click event) can still play
+  // sounds. The navigation from "/" to "/solo" counts as the user gesture; creating the
+  // AudioContext here keeps it alive for the rest of the session.
+  useEffect(() => {
+    if (!audioRef.current) {
+      audioRef.current = new AudioMediator()
+      audioRef.current.preload().catch((err) => {
+        console.error('audio preload failed', err)
+      })
+    }
     return () => {
       audioRef.current?.dispose()
       audioRef.current = null
@@ -113,6 +129,36 @@ function GameStage({
     return () => window.clearInterval(id)
   }, [gameState, setGameState])
 
+  // 3-second hold-to-start. While in SETUP, if setupStatus stays 'ready' for 3s, auto-advance
+  // to COUNTDOWN. Any drop out of 'ready' resets the hold. We read status via a ref so the
+  // interval doesn't tear down on every status change.
+  useEffect(() => {
+    if (gameState !== 'SETUP') {
+      setupHoldStartRef.current = null
+      setHoldRemaining(null)
+      return
+    }
+    const id = window.setInterval(() => {
+      if (setupStatusRef.current !== 'ready') {
+        setupHoldStartRef.current = null
+        setHoldRemaining(null)
+        return
+      }
+      if (setupHoldStartRef.current === null) {
+        setupHoldStartRef.current = Date.now()
+      }
+      const elapsed = Date.now() - setupHoldStartRef.current
+      if (elapsed >= 3000) {
+        setupHoldStartRef.current = null
+        setHoldRemaining(null)
+        setGameState('COUNTDOWN')
+        return
+      }
+      setHoldRemaining(Math.max(1, Math.ceil((3000 - elapsed) / 1000)))
+    }, 100)
+    return () => window.clearInterval(id)
+  }, [gameState, setGameState])
+
   // If the user breaks position mid-countdown, abort back to SETUP so they re-confirm.
   useEffect(() => {
     if (gameState === 'COUNTDOWN' && pose.setupStatus !== 'ready') {
@@ -129,16 +175,6 @@ function GameStage({
     }, 250)
     return () => window.clearInterval(id)
   }, [gameState])
-
-  const handleReady = () => {
-    if (!audioRef.current) {
-      audioRef.current = new AudioMediator()
-      audioRef.current.preload().catch((err) => {
-        console.error('audio preload failed', err)
-      })
-    }
-    setGameState('COUNTDOWN')
-  }
 
   const handleQuit = () => {
     const duration = startTimeRef.current
@@ -210,7 +246,7 @@ function GameStage({
                 pose.setupStatus === 'ready' ? 'text-bone' : 'text-blood'
               }`}
             >
-              {setupStatusMessage(pose.setupStatus, pose.missingParts)}
+              {setupStatusMessage(pose.setupStatus, pose.missingParts, holdRemaining)}
             </span>
           </div>
         )}
@@ -288,23 +324,12 @@ function GameStage({
 
       <div className="flex flex-col items-center gap-6 px-6">
         {gameState === 'SETUP' && (
-          <>
-            <button
-              type="button"
-              onClick={handleReady}
-              disabled={pose.setupStatus !== 'ready'}
-              aria-disabled={pose.setupStatus !== 'ready'}
-              className="font-display text-3xl md:text-4xl tracking-[0.25em] border border-bone/15 px-12 py-4 transition-colors hover:bg-bone hover:text-ink disabled:opacity-30 disabled:pointer-events-none"
-            >
-              READY
-            </button>
-            <Link
-              href="/"
-              className="font-mono text-xs uppercase tracking-[0.3em] opacity-60 hover:opacity-100"
-            >
-              Home
-            </Link>
-          </>
+          <Link
+            href="/"
+            className="font-mono text-xs uppercase tracking-[0.3em] opacity-60 hover:opacity-100"
+          >
+            Home
+          </Link>
         )}
 
         {gameState === 'ACTIVE' && (
@@ -416,7 +441,11 @@ function activeCommandLabel(
   return null
 }
 
-function setupStatusMessage(status: SetupStatus, missing: MissingPart[]): string {
+function setupStatusMessage(
+  status: SetupStatus,
+  missing: MissingPart[],
+  holdRemaining: number | null,
+): string {
   switch (status) {
     case 'camera-loading':
       return 'Requesting camera...'
@@ -429,7 +458,8 @@ function setupStatusMessage(status: SetupStatus, missing: MissingPart[]): string
     case 'not-in-plank':
       return 'Get in pushup position'
     case 'ready':
-      return 'Position locked. Press ready when set.'
+      if (holdRemaining !== null) return `Hold position: ${holdRemaining}`
+      return 'Position locked'
   }
 }
 

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   bodyAxisDirection,
   calculateAngle,
-  KNEE_PUSHUP_ANKLE_DEVIATION_MAX,
+  KNEE_STRAIGHT_MIN_DEG,
   loadMediaPipeScripts,
   MEDIAPIPE_CDN,
   midpoint,
@@ -244,14 +244,19 @@ export function usePose(): UsePoseReturn {
 
       const midShoulder = midpoint(ls, rs)
       const midHip = midpoint(lh, rh)
-      const midKnee = midpoint(lk, rk)
       const midAnkle = midpoint(la, ra)
 
       drawBodyAxis(ctx, canvas, midShoulder, midAnkle)
 
       // Rotation-invariant plank checks.
       const hipDev = perpendicularDistanceToLine(midHip, midShoulder, midAnkle)
-      const ankleDev = perpendicularDistanceToLine(midAnkle, midShoulder, midKnee)
+
+      // Knees must be ~straight (~180 degrees) to reject knee pushups. A genuinely straight
+      // leg measures 175-180; a knee pushup is around 90.
+      const leftKneeAngle = calculateAngle(lh, lk, la)
+      const rightKneeAngle = calculateAngle(rh, rk, ra)
+      const kneesStraight =
+        leftKneeAngle >= KNEE_STRAIGHT_MIN_DEG && rightKneeAngle >= KNEE_STRAIGHT_MIN_DEG
 
       const axis = bodyAxisDirection(midShoulder, midAnkle)
       const shoulderWidth = Math.abs(ls.x - rs.x)
@@ -260,10 +265,7 @@ export function usePose(): UsePoseReturn {
       const wristsAligned =
         leftWristDev <= WRIST_ALIGN_MAX_RATIO && rightWristDev <= WRIST_ALIGN_MAX_RATIO
 
-      const plank =
-        hipDev <= PLANK_HIP_DEVIATION_MAX &&
-        ankleDev <= KNEE_PUSHUP_ANKLE_DEVIATION_MAX &&
-        wristsAligned
+      const plank = hipDev <= PLANK_HIP_DEVIATION_MAX && kneesStraight && wristsAligned
 
       setMidShoulderY(midShoulder.y)
       setPlankValid(plank)
