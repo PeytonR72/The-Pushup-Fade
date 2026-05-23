@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { usePose, type SetupStatus } from '@/hooks/usePose'
+import { usePose, type MissingPart, type SetupStatus } from '@/hooks/usePose'
 import { useMediator, type MediatorSubState } from '@/hooks/useMediator'
 import { AudioMediator } from '@/lib/audio'
 import { appendSession, gradeFor } from '@/lib/storage'
@@ -210,7 +210,7 @@ function GameStage({
                 pose.setupStatus === 'ready' ? 'text-bone' : 'text-blood'
               }`}
             >
-              {setupStatusMessage(pose.setupStatus)}
+              {setupStatusMessage(pose.setupStatus, pose.missingParts)}
             </span>
           </div>
         )}
@@ -416,14 +416,16 @@ function activeCommandLabel(
   return null
 }
 
-function setupStatusMessage(status: SetupStatus): string {
+function setupStatusMessage(status: SetupStatus, missing: MissingPart[]): string {
   switch (status) {
     case 'camera-loading':
       return 'Requesting camera...'
     case 'no-pose':
       return 'Step into frame'
-    case 'frame-incomplete':
-      return 'Angle ~20 degrees so whole body fits in frame'
+    case 'frame-incomplete': {
+      const list = missing.length > 0 ? missing.join(', ') : 'body'
+      return `Angle ~20 degrees so whole body fits in frame. Missing: ${list}`
+    }
     case 'not-in-plank':
       return 'Get in pushup position'
     case 'ready':
