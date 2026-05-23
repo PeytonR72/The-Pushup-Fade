@@ -111,6 +111,12 @@ The /solo page operates as a state machine with exactly 5 top-level states:
 - Audio (`down.mp3`/`up.mp3`) is preloaded on `/solo` mount so that the auto-start (which
   is not a click event) can still play sounds. The navigation from `/` to `/solo` counts
   as the user gesture needed to create the AudioContext.
+- During SETUP a small debug HUD is rendered in the top-left of the camera feed showing the
+  live plank metrics (knee angles, hip deviation, wrist deviations) and per-landmark
+  visibility scores, with each value color-coded bone (passing) or blood (failing). This
+  exists so when "Hold position" never triggers, you can tell at a glance which check is
+  blocking it instead of guessing. Hook field: `setupMetrics: SetupMetrics`. Component:
+  `DebugHud` in [src/app/solo/page.tsx](src/app/solo/page.tsx). Only renders in SETUP.
 - Recommended camera setup: position yourself at roughly a 20-degree angle to the camera
   (not perfectly head-on, not perfectly side-on). At 0 degrees forward-facing your feet
   fall behind the camera's depth axis and can't be detected. At 20 degrees your full body
@@ -291,9 +297,15 @@ Each frame, compute:
 
 Plank is valid when ALL of:
 - hipDeviation <= 0.08
-- leftKneeAngle >= 150° AND rightKneeAngle >= 150°
+- leftKneeAngle >= 140° AND rightKneeAngle >= 140°
 - leftWristDeviation <= 1.0
 - rightWristDeviation <= 1.0
+
+(The knee threshold was tightened from 150° down to 140° after testing showed straight legs in
+the user's actual setup measure ~145–170° in 2D rather than the textbook ~180° — MediaPipe
+places the knee landmark at the kneecap, which sits slightly forward of the bone axis, and the
+2D projection of an angled body amplifies that offset. 140° still trivially rejects knee
+pushups, which measure ~90°.)
 
 (The wrist tolerance of 1.0× shoulder width is generous on purpose — it catches obviously wide
 or far-forward hand placement without flagging legitimate variations.)

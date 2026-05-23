@@ -28,6 +28,36 @@ export type SetupStatus =
 
 export type MissingPart = 'arms' | 'shoulders' | 'hips' | 'knees' | 'feet'
 
+export interface SetupMetrics {
+  hipDeviation: number | null
+  leftKneeAngle: number | null
+  rightKneeAngle: number | null
+  leftWristDeviation: number | null
+  rightWristDeviation: number | null
+  visibility: {
+    elbows: { left: number; right: number }
+    shoulders: { left: number; right: number }
+    hips: { left: number; right: number }
+    knees: { left: number; right: number }
+    ankles: { left: number; right: number }
+  }
+}
+
+const EMPTY_METRICS: SetupMetrics = {
+  hipDeviation: null,
+  leftKneeAngle: null,
+  rightKneeAngle: null,
+  leftWristDeviation: null,
+  rightWristDeviation: null,
+  visibility: {
+    elbows: { left: 0, right: 0 },
+    shoulders: { left: 0, right: 0 },
+    hips: { left: 0, right: 0 },
+    knees: { left: 0, right: 0 },
+    ankles: { left: 0, right: 0 },
+  },
+}
+
 export interface UsePoseReturn {
   videoRef: React.RefObject<HTMLVideoElement>
   canvasRef: React.RefObject<HTMLCanvasElement>
@@ -38,6 +68,7 @@ export interface UsePoseReturn {
   plankValid: boolean
   setupStatus: SetupStatus
   missingParts: MissingPart[]
+  setupMetrics: SetupMetrics
   isLoading: boolean
   error: string | null
   visibilityWarning: boolean
@@ -70,6 +101,7 @@ export function usePose(): UsePoseReturn {
   const [plankValid, setPlankValid] = useState(false)
   const [setupStatus, setSetupStatus] = useState<SetupStatus>('camera-loading')
   const [missingParts, setMissingParts] = useState<MissingPart[]>([])
+  const [setupMetrics, setSetupMetrics] = useState<SetupMetrics>(EMPTY_METRICS)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [visibilityWarning, setVisibilityWarning] = useState(false)
@@ -92,6 +124,7 @@ export function usePose(): UsePoseReturn {
     setPlankValid(false)
     setSetupStatus('camera-loading')
     setMissingParts([])
+    setSetupMetrics(EMPTY_METRICS)
     setVisibilityWarning(false)
     setPostureWarning(false)
     lowVisibilityFramesRef.current = 0
@@ -174,6 +207,7 @@ export function usePose(): UsePoseReturn {
         setPoseDetected(false)
         setSetupStatus('no-pose')
         setMissingParts([])
+        setSetupMetrics(EMPTY_METRICS)
         return
       }
 
@@ -209,6 +243,15 @@ export function usePose(): UsePoseReturn {
       if (!anklesVisible) missing.push('feet')
       setMissingParts(missing)
 
+      // Snapshot visibility for the debug HUD. Plank metrics filled in below if fullBodyVisible.
+      const visibilitySnapshot: SetupMetrics['visibility'] = {
+        elbows: { left: le?.visibility ?? 0, right: re?.visibility ?? 0 },
+        shoulders: { left: ls?.visibility ?? 0, right: rs?.visibility ?? 0 },
+        hips: { left: lh?.visibility ?? 0, right: rh?.visibility ?? 0 },
+        knees: { left: lk?.visibility ?? 0, right: rk?.visibility ?? 0 },
+        ankles: { left: la?.visibility ?? 0, right: ra?.visibility ?? 0 },
+      }
+
       if (fullBodyVisible) {
         lowVisibilityFramesRef.current = 0
         setVisibilityWarning(false)
@@ -223,6 +266,7 @@ export function usePose(): UsePoseReturn {
         setPoseDetected(false)
         setPlankValid(false)
         setSetupStatus('no-pose')
+        setSetupMetrics({ ...EMPTY_METRICS, visibility: visibilitySnapshot })
         return
       }
 
@@ -239,6 +283,7 @@ export function usePose(): UsePoseReturn {
         setMidShoulderY(null)
         setPlankValid(false)
         setSetupStatus('frame-incomplete')
+        setSetupMetrics({ ...EMPTY_METRICS, visibility: visibilitySnapshot })
         return
       }
 
@@ -270,6 +315,14 @@ export function usePose(): UsePoseReturn {
       setMidShoulderY(midShoulder.y)
       setPlankValid(plank)
       setSetupStatus(plank ? 'ready' : 'not-in-plank')
+      setSetupMetrics({
+        hipDeviation: hipDev,
+        leftKneeAngle,
+        rightKneeAngle,
+        leftWristDeviation: leftWristDev,
+        rightWristDeviation: rightWristDev,
+        visibility: visibilitySnapshot,
+      })
 
       if (plank) {
         invalidPlankFramesRef.current = 0
@@ -403,6 +456,7 @@ export function usePose(): UsePoseReturn {
     plankValid,
     setupStatus,
     missingParts,
+    setupMetrics,
     isLoading,
     error,
     visibilityWarning,
