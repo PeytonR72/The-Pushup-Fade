@@ -85,7 +85,10 @@ The /solo page operates as a state machine with exactly 5 top-level states:
   user knows what to fix. States and messages:
   - `camera-loading` → "Requesting camera..."
   - `no-pose` → "Step into frame"
-  - `frame-incomplete` → "Angle ~20 degrees so whole body fits in frame"
+  - `frame-incomplete` → "Angle ~20 degrees so whole body fits in frame. Missing: <parts>"
+    where `<parts>` is a comma-separated list drawn from {arms, shoulders, hips, knees, feet}
+    indicating which required landmark groups are not currently visible. The hook exposes this
+    as a `missingParts` array so the page can render it.
   - `not-in-plank` → "Get in pushup position"
   - `ready` → "Position locked. Press ready when set."
 - The READY button is enabled ONLY when `setupStatus === 'ready'`. All of the following
@@ -199,6 +202,15 @@ Required landmarks (track every frame):
 - Hips: 23 (left), 24 (right)
 - Knees: 25 (left), 26 (right)
 - Ankles: 27 (left), 28 (right)
+
+A required landmark counts as "visible" when its MediaPipe visibility score is >= 0.3. This
+is intentionally permissive: MediaPipe scores lower-body landmarks conservatively (often
+0.3-0.5 even when the landmark IS in frame, just smaller and farther from the camera), and a
+strict 0.5 threshold was rejecting feet/knees that the user could clearly see on screen.
+MediaPipe's own `minDetectionConfidence` and `minTrackingConfidence` are set to 0.3 in
+[src/hooks/usePose.ts](src/hooks/usePose.ts) for the same reason — these floor MediaPipe's
+willingness to emit a landmark at all. If you bump these back up, you'll regress to the
+previous "feet never detected on a laptop webcam" symptom.
 
 For posture checks, compute screen-space midpoints:
 - midShoulder = average of LEFT_SHOULDER and RIGHT_SHOULDER

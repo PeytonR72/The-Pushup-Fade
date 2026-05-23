@@ -26,6 +26,8 @@ export type SetupStatus =
   | 'not-in-plank'
   | 'ready'
 
+export type MissingPart = 'arms' | 'shoulders' | 'hips' | 'knees' | 'feet'
+
 export interface UsePoseReturn {
   videoRef: React.RefObject<HTMLVideoElement>
   canvasRef: React.RefObject<HTMLCanvasElement>
@@ -35,6 +37,7 @@ export interface UsePoseReturn {
   poseDetected: boolean
   plankValid: boolean
   setupStatus: SetupStatus
+  missingParts: MissingPart[]
   isLoading: boolean
   error: string | null
   visibilityWarning: boolean
@@ -42,7 +45,10 @@ export interface UsePoseReturn {
   retry: () => void
 }
 
-const VISIBILITY_THRESHOLD = 0.5
+// MediaPipe scores lower-body landmarks conservatively, especially when they're far from the
+// camera or partially out of frame. 0.3 is forgiving enough that hips/knees/ankles register
+// when they're actually in shot, but still rejects landmarks that MediaPipe is hallucinating.
+const VISIBILITY_THRESHOLD = 0.3
 const LOW_VISIBILITY_FRAME_LIMIT = 10
 const INVALID_PLANK_FRAME_LIMIT = 10
 
@@ -63,6 +69,7 @@ export function usePose(): UsePoseReturn {
   const [poseDetected, setPoseDetected] = useState(false)
   const [plankValid, setPlankValid] = useState(false)
   const [setupStatus, setSetupStatus] = useState<SetupStatus>('camera-loading')
+  const [missingParts, setMissingParts] = useState<MissingPart[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [visibilityWarning, setVisibilityWarning] = useState(false)
@@ -84,6 +91,7 @@ export function usePose(): UsePoseReturn {
     setPoseDetected(false)
     setPlankValid(false)
     setSetupStatus('camera-loading')
+    setMissingParts([])
     setVisibilityWarning(false)
     setPostureWarning(false)
     lowVisibilityFramesRef.current = 0
@@ -165,6 +173,7 @@ export function usePose(): UsePoseReturn {
       if (!landmarks || landmarks.length < 29) {
         setPoseDetected(false)
         setSetupStatus('no-pose')
+        setMissingParts([])
         return
       }
 
@@ -181,21 +190,24 @@ export function usePose(): UsePoseReturn {
       const la = landmarks[POSE_LANDMARKS.LEFT_ANKLE]
       const ra = landmarks[POSE_LANDMARKS.RIGHT_ANKLE]
 
-      const leftElbowVis = le?.visibility ?? 0
-      const rightElbowVis = re?.visibility ?? 0
-      const elbowsVisible =
-        leftElbowVis >= VISIBILITY_THRESHOLD && rightElbowVis >= VISIBILITY_THRESHOLD
+      const visOk = (lm: Landmark | undefined) => (lm?.visibility ?? 0) >= VISIBILITY_THRESHOLD
+
+      const elbowsVisible = visOk(le) && visOk(re)
+      const shouldersVisible = visOk(ls) && visOk(rs)
+      const hipsVisible = visOk(lh) && visOk(rh)
+      const kneesVisible = visOk(lk) && visOk(rk)
+      const anklesVisible = visOk(la) && visOk(ra)
 
       const fullBodyVisible =
-        elbowsVisible &&
-        (ls?.visibility ?? 0) >= VISIBILITY_THRESHOLD &&
-        (rs?.visibility ?? 0) >= VISIBILITY_THRESHOLD &&
-        (lh?.visibility ?? 0) >= VISIBILITY_THRESHOLD &&
-        (rh?.visibility ?? 0) >= VISIBILITY_THRESHOLD &&
-        (lk?.visibility ?? 0) >= VISIBILITY_THRESHOLD &&
-        (rk?.visibility ?? 0) >= VISIBILITY_THRESHOLD &&
-        (la?.visibility ?? 0) >= VISIBILITY_THRESHOLD &&
-        (ra?.visibility ?? 0) >= VISIBILITY_THRESHOLD
+        elbowsVisible && shouldersVisible && hipsVisible && kneesVisible && anklesVisible
+
+      const missing: MissingPart[] = []
+      if (!elbowsVisible) missing.push('arms')
+      if (!shouldersVisible) missing.push('shoulders')
+      if (!hipsVisible) missing.push('hips')
+      if (!kneesVisible) missing.push('knees')
+      if (!anklesVisible) missing.push('feet')
+      setMissingParts(missing)
 
       if (fullBodyVisible) {
         lowVisibilityFramesRef.current = 0
@@ -321,8 +333,8 @@ export function usePose(): UsePoseReturn {
         pose.setOptions({
           modelComplexity: 1,
           smoothLandmarks: true,
-          minDetectionConfidence: 0.5,
-          minTrackingConfidence: 0.5,
+          minDetectionConfidence: 0.3,
+          minTrackingConfidence: 0.3,
         })
         pose.onResults(handleResults)
         poseRef.current = pose
@@ -388,6 +400,7 @@ export function usePose(): UsePoseReturn {
     poseDetected,
     plankValid,
     setupStatus,
+    missingParts,
     isLoading,
     error,
     visibilityWarning,
