@@ -69,10 +69,11 @@ export const POSE_LANDMARKS = {
   RIGHT_ANKLE: 28,
 } as const
 
-// Rotation-invariant plank thresholds, measured as perpendicular distance from the
-// shoulder->ankle line in normalized image coords (0..1 across each axis).
+// Rotation-invariant plank thresholds. hipDeviation is perpendicular distance from
+// the shoulder->ankle line in normalized image coords. KNEE_STRAIGHT_MIN_DEG is the
+// minimum acceptable hip-knee-ankle angle (straight leg = ~180°, knee pushup ~90°).
 export const PLANK_HIP_DEVIATION_MAX = 0.08
-export const KNEE_PUSHUP_ANKLE_DEVIATION_MAX = 0.06
+export const KNEE_STRAIGHT_MIN_DEG = 150
 export const WRIST_ALIGN_MAX_RATIO = 1.0
 
 export const MEDIAPIPE_CDN = {

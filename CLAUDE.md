@@ -90,15 +90,27 @@ The /solo page operates as a state machine with exactly 5 top-level states:
     indicating which required landmark groups are not currently visible. The hook exposes this
     as a `missingParts` array so the page can render it.
   - `not-in-plank` → "Get in pushup position"
-  - `ready` → "Position locked. Press ready when set."
-- The READY button is enabled ONLY when `setupStatus === 'ready'`. All of the following
-  must hold for that to be the case:
-  - Both elbows, both shoulders, both hips, both knees, both ankles have visibility >= 0.5
+  - `ready` → "Hold position: N" (where N counts down 3, 2, 1) — see hold-to-start below
+- There is NO "READY" button. The session auto-starts after the user holds a valid
+  `'ready'` state continuously for 3 seconds. (The earlier button design was rejected
+  because pressing it knocked the user out of plank.) During the hold:
+  - Each frame, the page checks `setupStatus`. If it stays `'ready'`, a hold timer
+    accumulates; when it reaches 3000ms the page transitions to COUNTDOWN.
+  - Any drop out of `'ready'` resets the hold timer immediately. No grace period yet —
+    add one if landmark jitter causes spurious resets.
+  - The visible "Hold position: N" counter is driven by this same timer so the user sees
+    the seconds tick down.
+- A valid `'ready'` state requires ALL of:
+  - Both elbows, both shoulders, both hips, both knees, both ankles have visibility >= 0.3
+    (see "A required landmark counts as visible..." below for why 0.3 not 0.5)
   - The user is in a valid plank (see Plank Posture Gate below for the rotation-invariant
-    checks: hip on the body axis, ankle on the shoulder-knee line, wrists positioned along
-    the body-axis-perpendicular)
+    checks: hip on the body axis, both knees nearly straight, wrists positioned along the
+    body-axis-perpendicular)
 - If `setupStatus` drops out of `'ready'` during COUNTDOWN, the page cancels the countdown
   and returns to SETUP so the user must reconfirm position.
+- Audio (`down.mp3`/`up.mp3`) is preloaded on `/solo` mount so that the auto-start (which
+  is not a click event) can still play sounds. The navigation from `/` to `/solo` counts
+  as the user gesture needed to create the AudioContext.
 - Recommended camera setup: position yourself at roughly a 20-degree angle to the camera
   (not perfectly head-on, not perfectly side-on). At 0 degrees forward-facing your feet
   fall behind the camera's depth axis and can't be detected. At 20 degrees your full body
@@ -263,10 +275,12 @@ Each frame, compute:
   and midAnkle (rotation-invariant, in normalized image units; use the 2D cross-product form
   `|(p - p1) × (p2 - p1)| / |p2 - p1|`). If the body axis is degenerate (midShoulder == midAnkle),
   treat as 0.
-- ankleDeviation = perpendicular distance from midAnkle to the line through midShoulder and
-  midKnee. In a real plank, ankle continues the shoulder-knee line, so this stays small. In a
-  knee pushup the foot is raised, so the ankle pops off the line and this grows. This is the
-  knee-pushup cheat check.
+- leftKneeAngle = angle of LEFT_HIP -> LEFT_KNEE -> LEFT_ANKLE (uses calculateAngle)
+- rightKneeAngle = angle of RIGHT_HIP -> RIGHT_KNEE -> RIGHT_ANKLE
+  (A straight leg measures ~175-180°; a knee pushup measures ~90° because the lower leg
+  swings up off the floor. This is the knee-pushup cheat check. An earlier attempt used
+  "ankle perpendicular distance from the shoulder-knee line" but that proved sensitive to
+  landmark jitter and failed straight legs while passing slightly bent ones.)
 - shoulderWidth = |LEFT_SHOULDER.x - RIGHT_SHOULDER.x| in normalized image coords. Used as a
   per-user scale so wrist tolerance auto-adjusts to camera distance.
 - leftWristDeviation = |dot(LEFT_WRIST - LEFT_SHOULDER, bodyAxis)| / shoulderWidth
@@ -277,7 +291,7 @@ Each frame, compute:
 
 Plank is valid when ALL of:
 - hipDeviation <= 0.08
-- ankleDeviation <= 0.06
+- leftKneeAngle >= 150° AND rightKneeAngle >= 150°
 - leftWristDeviation <= 1.0
 - rightWristDeviation <= 1.0
 
