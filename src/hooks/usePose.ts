@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  bodyAxisAngleFromHorizontal,
+  bodyAxisDirection,
   calculateAngle,
-  hipDeviationFromAxis,
+  KNEE_PUSHUP_ANKLE_DEVIATION_MAX,
   loadMediaPipeScripts,
   MEDIAPIPE_CDN,
   midpoint,
-  PLANK_AXIS_ANGLE_MAX_DEG,
+  perpendicularDistanceToLine,
   PLANK_HIP_DEVIATION_MAX,
   POSE_LANDMARKS,
   WRIST_ALIGN_MAX_RATIO,
@@ -19,6 +19,13 @@ import {
   type PoseResults,
 } from '@/lib/mediapipe'
 
+export type SetupStatus =
+  | 'camera-loading'
+  | 'no-pose'
+  | 'frame-incomplete'
+  | 'not-in-plank'
+  | 'ready'
+
 export interface UsePoseReturn {
   videoRef: React.RefObject<HTMLVideoElement>
   canvasRef: React.RefObject<HTMLCanvasElement>
@@ -27,6 +34,7 @@ export interface UsePoseReturn {
   midShoulderY: number | null
   poseDetected: boolean
   plankValid: boolean
+  setupStatus: SetupStatus
   isLoading: boolean
   error: string | null
   visibilityWarning: boolean
@@ -54,6 +62,7 @@ export function usePose(): UsePoseReturn {
   const [midShoulderY, setMidShoulderY] = useState<number | null>(null)
   const [poseDetected, setPoseDetected] = useState(false)
   const [plankValid, setPlankValid] = useState(false)
+  const [setupStatus, setSetupStatus] = useState<SetupStatus>('camera-loading')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [visibilityWarning, setVisibilityWarning] = useState(false)
@@ -74,6 +83,7 @@ export function usePose(): UsePoseReturn {
     setMidShoulderY(null)
     setPoseDetected(false)
     setPlankValid(false)
+    setSetupStatus('camera-loading')
     setVisibilityWarning(false)
     setPostureWarning(false)
     lowVisibilityFramesRef.current = 0
@@ -154,6 +164,7 @@ export function usePose(): UsePoseReturn {
       const landmarks = results.poseLandmarks
       if (!landmarks || landmarks.length < 29) {
         setPoseDetected(false)
+        setSetupStatus('no-pose')
         return
       }
 
@@ -165,6 +176,8 @@ export function usePose(): UsePoseReturn {
       const rw = landmarks[POSE_LANDMARKS.RIGHT_WRIST]
       const lh = landmarks[POSE_LANDMARKS.LEFT_HIP]
       const rh = landmarks[POSE_LANDMARKS.RIGHT_HIP]
+      const lk = landmarks[POSE_LANDMARKS.LEFT_KNEE]
+      const rk = landmarks[POSE_LANDMARKS.RIGHT_KNEE]
       const la = landmarks[POSE_LANDMARKS.LEFT_ANKLE]
       const ra = landmarks[POSE_LANDMARKS.RIGHT_ANKLE]
 
@@ -179,6 +192,8 @@ export function usePose(): UsePoseReturn {
         (rs?.visibility ?? 0) >= VISIBILITY_THRESHOLD &&
         (lh?.visibility ?? 0) >= VISIBILITY_THRESHOLD &&
         (rh?.visibility ?? 0) >= VISIBILITY_THRESHOLD &&
+        (lk?.visibility ?? 0) >= VISIBILITY_THRESHOLD &&
+        (rk?.visibility ?? 0) >= VISIBILITY_THRESHOLD &&
         (la?.visibility ?? 0) >= VISIBILITY_THRESHOLD &&
         (ra?.visibility ?? 0) >= VISIBILITY_THRESHOLD
 
@@ -195,6 +210,7 @@ export function usePose(): UsePoseReturn {
       if (!elbowsVisible) {
         setPoseDetected(false)
         setPlankValid(false)
+        setSetupStatus('no-pose')
         return
       }
 
@@ -210,31 +226,36 @@ export function usePose(): UsePoseReturn {
       if (!fullBodyVisible) {
         setMidShoulderY(null)
         setPlankValid(false)
+        setSetupStatus('frame-incomplete')
         return
       }
 
       const midShoulder = midpoint(ls, rs)
       const midHip = midpoint(lh, rh)
+      const midKnee = midpoint(lk, rk)
       const midAnkle = midpoint(la, ra)
 
       drawBodyAxis(ctx, canvas, midShoulder, midAnkle)
 
-      const axisAngle = bodyAxisAngleFromHorizontal(midShoulder, midAnkle)
-      const hipDev = hipDeviationFromAxis(midShoulder, midHip, midAnkle)
+      // Rotation-invariant plank checks.
+      const hipDev = perpendicularDistanceToLine(midHip, midShoulder, midAnkle)
+      const ankleDev = perpendicularDistanceToLine(midAnkle, midShoulder, midKnee)
 
+      const axis = bodyAxisDirection(midShoulder, midAnkle)
       const shoulderWidth = Math.abs(ls.x - rs.x)
-      const leftWristDev = wristAlignmentRatio(ls, lw, shoulderWidth)
-      const rightWristDev = wristAlignmentRatio(rs, rw, shoulderWidth)
+      const leftWristDev = wristAlignmentRatio(ls, lw, shoulderWidth, axis)
+      const rightWristDev = wristAlignmentRatio(rs, rw, shoulderWidth, axis)
       const wristsAligned =
         leftWristDev <= WRIST_ALIGN_MAX_RATIO && rightWristDev <= WRIST_ALIGN_MAX_RATIO
 
       const plank =
-        axisAngle <= PLANK_AXIS_ANGLE_MAX_DEG &&
         hipDev <= PLANK_HIP_DEVIATION_MAX &&
+        ankleDev <= KNEE_PUSHUP_ANKLE_DEVIATION_MAX &&
         wristsAligned
 
       setMidShoulderY(midShoulder.y)
       setPlankValid(plank)
+      setSetupStatus(plank ? 'ready' : 'not-in-plank')
 
       if (plank) {
         invalidPlankFramesRef.current = 0
@@ -280,6 +301,7 @@ export function usePose(): UsePoseReturn {
 
         if (cancelled) return
         setIsLoading(false)
+        setSetupStatus('no-pose')
 
         try {
           await loadMediaPipeScripts()
@@ -365,6 +387,7 @@ export function usePose(): UsePoseReturn {
     midShoulderY,
     poseDetected,
     plankValid,
+    setupStatus,
     isLoading,
     error,
     visibilityWarning,

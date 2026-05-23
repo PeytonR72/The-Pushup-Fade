@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { usePose } from '@/hooks/usePose'
+import { usePose, type SetupStatus } from '@/hooks/usePose'
 import { useMediator, type MediatorSubState } from '@/hooks/useMediator'
 import { AudioMediator } from '@/lib/audio'
 import { appendSession, gradeFor } from '@/lib/storage'
@@ -113,6 +113,13 @@ function GameStage({
     return () => window.clearInterval(id)
   }, [gameState, setGameState])
 
+  // If the user breaks position mid-countdown, abort back to SETUP so they re-confirm.
+  useEffect(() => {
+    if (gameState === 'COUNTDOWN' && pose.setupStatus !== 'ready') {
+      setGameState('SETUP')
+    }
+  }, [gameState, pose.setupStatus, setGameState])
+
   useEffect(() => {
     if (gameState !== 'ACTIVE') return
     const id = window.setInterval(() => {
@@ -196,10 +203,14 @@ function GameStage({
           </div>
         )}
 
-        {gameState === 'SETUP' && !pose.isLoading && !pose.poseDetected && (
+        {gameState === 'SETUP' && !pose.isLoading && (
           <div className="absolute bottom-4 left-4 right-4 text-center">
-            <span className="font-mono text-[10px] uppercase tracking-[0.3em] opacity-60">
-              Detecting pose
+            <span
+              className={`font-mono text-[11px] md:text-xs uppercase tracking-[0.3em] ${
+                pose.setupStatus === 'ready' ? 'text-bone' : 'text-blood'
+              }`}
+            >
+              {setupStatusMessage(pose.setupStatus)}
             </span>
           </div>
         )}
@@ -281,8 +292,8 @@ function GameStage({
             <button
               type="button"
               onClick={handleReady}
-              disabled={!pose.poseDetected}
-              aria-disabled={!pose.poseDetected}
+              disabled={pose.setupStatus !== 'ready'}
+              aria-disabled={pose.setupStatus !== 'ready'}
               className="font-display text-3xl md:text-4xl tracking-[0.25em] border border-bone/15 px-12 py-4 transition-colors hover:bg-bone hover:text-ink disabled:opacity-30 disabled:pointer-events-none"
             >
               READY
@@ -403,6 +414,21 @@ function activeCommandLabel(
   if (subState === 'HOLDING_BOTTOM') return 'HOLD'
   if (subState === 'WAITING_FOR_UP') return 'UP'
   return null
+}
+
+function setupStatusMessage(status: SetupStatus): string {
+  switch (status) {
+    case 'camera-loading':
+      return 'Requesting camera...'
+    case 'no-pose':
+      return 'Step into frame'
+    case 'frame-incomplete':
+      return 'Angle ~20 degrees so whole body fits in frame'
+    case 'not-in-plank':
+      return 'Get in pushup position'
+    case 'ready':
+      return 'Position locked. Press ready when set.'
+  }
 }
 
 function formatDuration(seconds: number): string {
