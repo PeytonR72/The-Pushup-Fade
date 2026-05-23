@@ -63,12 +63,16 @@ export const POSE_LANDMARKS = {
   RIGHT_WRIST: 16,
   LEFT_HIP: 23,
   RIGHT_HIP: 24,
+  LEFT_KNEE: 25,
+  RIGHT_KNEE: 26,
   LEFT_ANKLE: 27,
   RIGHT_ANKLE: 28,
 } as const
 
-export const PLANK_AXIS_ANGLE_MAX_DEG = 25
-export const PLANK_HIP_DEVIATION_MAX = 0.1
+// Rotation-invariant plank thresholds, measured as perpendicular distance from the
+// shoulder->ankle line in normalized image coords (0..1 across each axis).
+export const PLANK_HIP_DEVIATION_MAX = 0.08
+export const KNEE_PUSHUP_ANKLE_DEVIATION_MAX = 0.06
 export const WRIST_ALIGN_MAX_RATIO = 1.0
 
 export const MEDIAPIPE_CDN = {
@@ -89,45 +93,54 @@ export function midpoint(a: Point2D, b: Point2D): Point2D {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
 }
 
-export function bodyAxisAngleFromHorizontal(
-  midShoulder: Point2D,
-  midAnkle: Point2D,
+// Perpendicular distance from a point to the infinite line through (lineStart, lineEnd),
+// in the same units as the input coords. Rotation-invariant.
+export function perpendicularDistanceToLine(
+  point: Point2D,
+  lineStart: Point2D,
+  lineEnd: Point2D,
 ): number {
-  const dx = Math.abs(midAnkle.x - midShoulder.x)
-  const dy = Math.abs(midAnkle.y - midShoulder.y)
-  return (Math.atan2(dy, dx) * 180) / Math.PI
+  const ax = lineEnd.x - lineStart.x
+  const ay = lineEnd.y - lineStart.y
+  const len = Math.sqrt(ax * ax + ay * ay)
+  if (len < 1e-6) return 0
+  const hx = point.x - lineStart.x
+  const hy = point.y - lineStart.y
+  return Math.abs(hx * ay - hy * ax) / len
 }
 
-export function hipDeviationFromAxis(
-  midShoulder: Point2D,
-  midHip: Point2D,
-  midAnkle: Point2D,
-): number {
-  const dx = midAnkle.x - midShoulder.x
-  if (Math.abs(dx) < 1e-6) return 0
-  const t = (midHip.x - midShoulder.x) / dx
-  const expectedY = midShoulder.y + t * (midAnkle.y - midShoulder.y)
-  return Math.abs(midHip.y - expectedY)
+// Unit vector along the body axis (shoulder -> ankle, or shoulder -> knee if ankles missing).
+// Returns null if the two endpoints coincide.
+export function bodyAxisDirection(
+  start: Point2D,
+  end: Point2D,
+): { x: number; y: number } | null {
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const len = Math.sqrt(dx * dx + dy * dy)
+  if (len < 1e-6) return null
+  return { x: dx / len, y: dy / len }
 }
 
-export function isPlankValid(
-  midShoulder: Point2D,
-  midHip: Point2D,
-  midAnkle: Point2D,
-): boolean {
-  return (
-    bodyAxisAngleFromHorizontal(midShoulder, midAnkle) <= PLANK_AXIS_ANGLE_MAX_DEG &&
-    hipDeviationFromAxis(midShoulder, midHip, midAnkle) <= PLANK_HIP_DEVIATION_MAX
-  )
-}
-
+// How far the wrist sits ALONG the body axis from the shoulder, as a multiple of shoulder
+// width. In a real pushup the wrist drops perpendicular to the body axis, so this number
+// stays small. Hands placed far forward or back of the shoulders produce a large value.
 export function wristAlignmentRatio(
   shoulder: Point2D,
   wrist: Point2D,
   shoulderWidth: number,
+  bodyAxis: { x: number; y: number } | null,
 ): number {
   if (shoulderWidth < 1e-6) return Infinity
-  return Math.abs(wrist.x - shoulder.x) / shoulderWidth
+  const dx = wrist.x - shoulder.x
+  const dy = wrist.y - shoulder.y
+  if (!bodyAxis) {
+    // No body axis available: fall back to absolute x-distance, like the old check.
+    return Math.abs(dx) / shoulderWidth
+  }
+  // Component of shoulder->wrist projected onto the body axis.
+  const parallel = dx * bodyAxis.x + dy * bodyAxis.y
+  return Math.abs(parallel) / shoulderWidth
 }
 
 function loadScript(src: string): Promise<void> {

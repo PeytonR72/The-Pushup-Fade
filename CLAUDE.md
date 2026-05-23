@@ -81,9 +81,26 @@ The /solo page operates as a state machine with exactly 5 top-level states:
 - Request webcam permission
 - Initialize MediaPipe Pose from CDN
 - Show camera feed with landmark overlay once pose is detected
-- Show "READY" button only after both arms are detected: both elbow landmarks have visibility
-  >= 0.5 and both elbow angles are computable
-- Do not allow the user to proceed until pose is confirmed
+- Display a `setupStatus` text below the feed that diagnoses the current state so the
+  user knows what to fix. States and messages:
+  - `camera-loading` → "Requesting camera..."
+  - `no-pose` → "Step into frame"
+  - `frame-incomplete` → "Angle ~20 degrees so whole body fits in frame"
+  - `not-in-plank` → "Get in pushup position"
+  - `ready` → "Position locked. Press ready when set."
+- The READY button is enabled ONLY when `setupStatus === 'ready'`. All of the following
+  must hold for that to be the case:
+  - Both elbows, both shoulders, both hips, both knees, both ankles have visibility >= 0.5
+  - The user is in a valid plank (see Plank Posture Gate below for the rotation-invariant
+    checks: hip on the body axis, ankle on the shoulder-knee line, wrists positioned along
+    the body-axis-perpendicular)
+- If `setupStatus` drops out of `'ready'` during COUNTDOWN, the page cancels the countdown
+  and returns to SETUP so the user must reconfirm position.
+- Recommended camera setup: position yourself at roughly a 20-degree angle to the camera
+  (not perfectly head-on, not perfectly side-on). At 0 degrees forward-facing your feet
+  fall behind the camera's depth axis and can't be detected. At 20 degrees your full body
+  fits comfortably in frame, you can still glance at the screen, and rep detection is
+  symmetric on both arms.
 
 ### 2. COUNTDOWN
 - 3... 2... 1... displayed in large type over the feed
@@ -168,21 +185,25 @@ https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js
 https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js
 ```
 
-### Forward-Facing Setup and Landmark Selection
-Phase 1 assumes a forward-facing camera (phone or laptop placed in front of the user, low or at
-floor level, framing the whole body in plank). Both arms are tracked symmetrically every frame.
-Single-arm side-on filming is NOT supported.
+### Camera Setup and Landmark Selection
+Phase 1 assumes the user is roughly facing the camera but rotated ~20 degrees to one side, so
+the whole body fits in frame. (At a pure 0-degree forward-facing angle, the body extends back
+along the camera's depth axis and the feet are physically out of frame; full-body checks become
+impossible.) Both arms are tracked symmetrically every frame. Single-arm side-on filming is NOT
+supported.
 
 Required landmarks (track every frame):
 - Shoulders: 11 (left), 12 (right)
 - Elbows: 13 (left), 14 (right)
 - Wrists: 15 (left), 16 (right)
 - Hips: 23 (left), 24 (right)
+- Knees: 25 (left), 26 (right)
 - Ankles: 27 (left), 28 (right)
 
 For posture checks, compute screen-space midpoints:
 - midShoulder = average of LEFT_SHOULDER and RIGHT_SHOULDER
 - midHip = average of LEFT_HIP and RIGHT_HIP
+- midKnee = average of LEFT_KNEE and RIGHT_KNEE
 - midAnkle = average of LEFT_ANKLE and RIGHT_ANKLE
 
 Compute the elbow angle independently for each side using the formula below. Both angles must
@@ -219,32 +240,43 @@ recovers. This warning is suppressed in SETUP, since the user may not yet be in 
 
 ### Plank Posture Gate
 The user must be in plank position with hands roughly under shoulders for rep detection to run.
+All checks here are ROTATION-INVARIANT in 2D image space, so they work whether the user's body
+in the image is horizontal (pure side-on), diagonal (the recommended ~20-degree angle), or
+anywhere in between. We do NOT measure angle from horizontal anywhere in the plank check.
+
 Each frame, compute:
 
-- bodyAxisAngle = atan2(|midAnkle.y - midShoulder.y|, |midAnkle.x - midShoulder.x|) * 180 / PI
-  (angle of the body axis from horizontal, in degrees, range 0-90)
-- hipDeviation = perpendicular(ish) distance from midHip to the line midShoulder->midAnkle,
-  measured as |midHip.y - lineYAtX(midHip.x)| in normalized image coords. If the line is
-  degenerate (midAnkle.x ≈ midShoulder.x), treat hipDeviation as 0.
-- shoulderWidth = |LEFT_SHOULDER.x - RIGHT_SHOULDER.x| in normalized image coords. This is
-  used as a per-user scale so the tolerance auto-adjusts to camera distance.
-- leftWristDeviation = |LEFT_WRIST.x - LEFT_SHOULDER.x| / shoulderWidth
-- rightWristDeviation = |RIGHT_WRIST.x - RIGHT_SHOULDER.x| / shoulderWidth
-  (each wrist's horizontal distance from its shoulder, expressed as a multiple of shoulder width)
+- bodyAxis = unit vector from midShoulder to midAnkle in normalized image coords.
+- hipDeviation = perpendicular distance from midHip to the infinite line through midShoulder
+  and midAnkle (rotation-invariant, in normalized image units; use the 2D cross-product form
+  `|(p - p1) × (p2 - p1)| / |p2 - p1|`). If the body axis is degenerate (midShoulder == midAnkle),
+  treat as 0.
+- ankleDeviation = perpendicular distance from midAnkle to the line through midShoulder and
+  midKnee. In a real plank, ankle continues the shoulder-knee line, so this stays small. In a
+  knee pushup the foot is raised, so the ankle pops off the line and this grows. This is the
+  knee-pushup cheat check.
+- shoulderWidth = |LEFT_SHOULDER.x - RIGHT_SHOULDER.x| in normalized image coords. Used as a
+  per-user scale so wrist tolerance auto-adjusts to camera distance.
+- leftWristDeviation = |dot(LEFT_WRIST - LEFT_SHOULDER, bodyAxis)| / shoulderWidth
+- rightWristDeviation = |dot(RIGHT_WRIST - RIGHT_SHOULDER, bodyAxis)| / shoulderWidth
+  (each wrist's offset from its shoulder projected ONTO the body axis, expressed as a multiple
+  of shoulder width — i.e. how far forward or back along the body the wrist sits. In a clean
+  pushup the wrist drops perpendicular to the body axis, so this projection stays small.)
 
 Plank is valid when ALL of:
-- bodyAxisAngle <= 25°
-- hipDeviation <= 0.10
+- hipDeviation <= 0.08
+- ankleDeviation <= 0.06
 - leftWristDeviation <= 1.0
 - rightWristDeviation <= 1.0
 
 (The wrist tolerance of 1.0× shoulder width is generous on purpose — it catches obviously wide
-hand placement without flagging legitimate variations like slightly-outside-shoulder-width hands.)
+or far-forward hand placement without flagging legitimate variations.)
 
 If plank is invalid for more than 10 consecutive frames during the ACTIVE state, pause the
 session and show: "GET IN PUSHUP POSITION". Resume when plank is valid again. This gate is
-evaluated only during ACTIVE (and PAUSED, where it is irrelevant); SETUP and COUNTDOWN do not
-enforce it.
+evaluated only during ACTIVE (and PAUSED, where it is irrelevant); SETUP also evaluates plank
+validity to gate the READY button, but uses no consecutive-frame buffer there (the user can
+keep adjusting in SETUP, and the button enables/disables in real time).
 
 ## Audio Implementation
 
